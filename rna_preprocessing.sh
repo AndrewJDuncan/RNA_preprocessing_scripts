@@ -1,14 +1,15 @@
 #!/bin/bash
+set -euo pipefail
 
 # define base directory
 BASE_DIR="$HOME/projects/rna_pipeline/mgp_test_data"
 
 #define subdirectories
 RAW_DIR="$BASE_DIR/rawdata"
-PREPROC_DIR="BASE_DIR/preproc"
+PREPROC_DIR="$BASE_DIR/preproc"
 LOG_DIR="$PREPROC_DIR/logs"
 OUTPUT_DIR="$BASE_DIR/output"
-REF_DIR="BASE_DIR/references"
+REF_DIR="$BASE_DIR/references"
 
 # create directories if they don't exist
 mkdir -p "$PREPROC_DIR" "$LOG_DIR" "$OUTPUT_DIR" "$REF_DIR"
@@ -49,21 +50,21 @@ for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do
         in1="$PREPROC_DIR/${sample}_dedup_R1.fastq.gz" \
         in2="$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
         stats="$PREPROC_DIR/${sample}_rrna.txt" \
-        1>"LOG_DIR/${sample}_rrna.out" 2>"$LOG_DIR/${sample}_rrna.err"
+        1>"$LOG_DIR/${sample}_rrna.out" 2>"$LOG_DIR/${sample}_rrna.err"
 
     # merge paired-end reads
     $PEAR -f "$PREPROC_DIR/${sample}_dedup_R1.fastq.gz" \
         -r "$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
         -o "$PREPROC_DIR/${sample}_merged" \
-        1>"$LOG_DIR/${sample}_pear.out" 2>"$LOG_DIR\${sample}_pear.err"
+        1>"$LOG_DIR/${sample}_pear.out" 2>"$LOG_DIR/${sample}_pear.err"
 
     # adapter trim / polyA/T trim / q20 quality trim / dimer removal
     FASTP_INPUT="$PREPROC_DIR/${sample}_merged.assembled.fastq"
-    FASTP_OUTPUT="$PREPROC_DIR/$sample}_clean.fastq.gz"
+    FASTP_OUTPUT="$PREPROC_DIR/${sample}_clean.fastq.gz"
     $FASTP -i "$FASTP_INPUT" -o "$FASTP_OUTPUT" \
         --qualified_quality_phred 20 --trim_poly_g --detect_adapter_for_pe \
         1>"$LOG_DIR/${sample}_fastp.out" 2>"$LOG_DIR/${sample}_fastp.err"
 
-    #generate statistics"
+    #generate statistics
     $SEQKIT stats "$PREPROC_DIR/${sample}_clean.fastq.gz" -j 4 | tee "$PREPROC_DIR/${sample}_stats.json"
 done
