@@ -31,7 +31,7 @@ for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do
     echo "  R2: $fq2"
 
     # PhiX removal
-    $BBMAP filter ref="REF_DIR/phix174_ill.ref.fa \
+    $BBMAP filter ref="REF_DIR/phix174_ill.ref.fa" \
         in1="$fq1" in2="$fq2" \
         out1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
         out2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
