@@ -30,20 +30,24 @@ for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do
     echo "  R1: $fq1"
     echo "  R2: $fq2"
 
-    # PhiX removal
-    $BBMAP filter ref="$REF_DIR/phix174_ill.ref.fa" \
-        in1="$fq1" in2="$fq2" \
-        out1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
-        out2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
-        1>"$LOG_DIR/${sample}_phix.out" 2>"$LOG_DIR/${sample}_phix.err"
+   # PhiX removal
+echo "Running PhiX removal for sample: $sample"
+$BBMAP filter ref="$REF_DIR/phix174_ill.ref.fa" \
+    in1="$fq1" in2="$fq2" \
+    out1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
+    out2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
+    1>"$LOG_DIR/${sample}_phix.out" 2>"$LOG_DIR/${sample}_phix.err"
+echo "Finished PhiX removal for sample: $sample"
 
-    # UMI-based deduplication
-    $UMI_TOOLS dedup --paired \
-        --in1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
-        --in2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
-        --out1="$PREPROC_DIR/${sample}_dedup_R1.fastq.gz" \
-        --out2="$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
-        1>"$LOG_DIR/${sample}_umi.out" 2>"$LOG_DIR/${sample}_umi.err"
+# UMI-based deduplication
+echo "Running UMI deduplication for sample: $sample"
+$UMI_TOOLS dedup --paired \
+    --in1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
+    --in2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
+    --out1="$PREPROC_DIR/${sample}_dedup_R1.fastq.gz" \
+    --out2="$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
+    1>"$LOG_DIR/${sample}_umi.out" 2>"$LOG_DIR/${sample}_umi.err"
+echo "Finished UMI deduplication for sample: $sample"
 
     # rRNA count
     $BBMAP filter ref="$REF_DIR/rrna.fasta" \
