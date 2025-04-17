@@ -30,46 +30,77 @@ for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do
     echo "  R1: $fq1"
     echo "  R2: $fq2"
 
-   # PhiX removal
-echo "Running PhiX removal for sample: $sample"
-$BBMAP filter ref="$REF_DIR/phix174_ill.ref.fa" \
-    in1="$fq1" in2="$fq2" \
-    out1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
-    out2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
-    1>"$LOG_DIR/${sample}_phix.out" 2>"$LOG_DIR/${sample}_phix.err"
-echo "Finished PhiX removal for sample: $sample"
+    ##########################
+    # Step 1: PhiX Removal
+    ##########################
+    echo "Running PhiX removal for sample $sample"
+    echo "$BBMAP filter ref=$REF_DIR/phix174_ill.ref.fa in1=$fq1 in2=$fq2 out1=$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz out2=$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz"
 
-# UMI-based deduplication
-echo "Running UMI deduplication for sample: $sample"
-$UMI_TOOLS dedup --paired \
-    --in1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
-    --in2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
-    --out1="$PREPROC_DIR/${sample}_dedup_R1.fastq.gz" \
-    --out2="$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
-    1>"$LOG_DIR/${sample}_umi.out" 2>"$LOG_DIR/${sample}_umi.err"
-echo "Finished UMI deduplication for sample: $sample"
+    $BBMAP filter \
+        ref="$REF_DIR/phix174_ill.ref.fa" \
+        in1="$fq1" \
+        in2="$fq2" \
+        out1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
+        out2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
+        1>"$LOG_DIR/${sample}_phix.out" \
+        2>"$LOG_DIR/${sample}_phix.err"
 
-    # rRNA count
-    $BBMAP filter ref="$REF_DIR/rrna.fasta" \
+    ##########################
+    # Step 2: UMI-based Deduplication
+    ##########################
+    echo "Running UMI deduplication for sample $sample"
+    $UMI_TOOLS dedup --paired \
+        --in1="$PREPROC_DIR/${sample}_noPhiX_R1.fastq.gz" \
+        --in2="$PREPROC_DIR/${sample}_noPhiX_R2.fastq.gz" \
+        --out1="$PREPROC_DIR/${sample}_dedup_R1.fastq.gz" \
+        --out2="$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
+        1>"$LOG_DIR/${sample}_umi.out" \
+        2>"$LOG_DIR/${sample}_umi.err"
+
+    ##########################
+    # Step 3: rRNA Counting
+    ##########################
+    echo "Running rRNA filtering for sample $sample"
+    $BBMAP filter \
+        ref="$REF_DIR/rrna.fasta" \
         in1="$PREPROC_DIR/${sample}_dedup_R1.fastq.gz" \
         in2="$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
         stats="$PREPROC_DIR/${sample}_rrna.txt" \
-        1>"$LOG_DIR/${sample}_rrna.out" 2>"$LOG_DIR/${sample}_rrna.err"
+        1>"$LOG_DIR/${sample}_rrna.out" \
+        2>"$LOG_DIR/${sample}_rrna.err"
 
-    # Merge paired-end reads
+    ##########################
+    # Step 4: Merge Paired-End Reads
+    ##########################
+    echo "Merging paired-end reads for sample $sample"
     $PEAR -f "$PREPROC_DIR/${sample}_dedup_R1.fastq.gz" \
-          -r "$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
-          -o "$PREPROC_DIR/${sample}_merged" \
-          1>"$LOG_DIR/${sample}_pear.out" 2>"$LOG_DIR/${sample}_pear.err"
+         -r "$PREPROC_DIR/${sample}_dedup_R2.fastq.gz" \
+         -o "$PREPROC_DIR/${sample}_merged" \
+         1>"$LOG_DIR/${sample}_pear.out" \
+         2>"$LOG_DIR/${sample}_pear.err"
 
-    # Adapter trimming, polyA/T trimming, Q20 trimming
+    ##########################
+    # Step 5: Trimming and Cleaning
+    ##########################
+    echo "Running fastp cleanup for sample $sample"
     FASTP_INPUT="$PREPROC_DIR/${sample}_merged.assembled.fastq"
     FASTP_OUTPUT="$PREPROC_DIR/${sample}_clean.fastq.gz"
 
     $FASTP -i "$FASTP_INPUT" -o "$FASTP_OUTPUT" \
-        --qualified_quality_phred 20 --trim_poly_g --detect_adapter_for_pe \
-        1>"$LOG_DIR/${sample}_fastp.out" 2>"$LOG_DIR/${sample}_fastp.err"
+        --qualified_quality_phred 20 \
+        --trim_poly_g \
+        --detect_adapter_for_pe \
+        1>"$LOG_DIR/${sample}_fastp.out" \
+        2>"$LOG_DIR/${sample}_fastp.err"
 
-    # Generate statistics
+    ##########################
+    # Step 6: Generate Statistics
+    ##########################
+    echo "Generating stats for sample $sample"
     $SEQKIT stats "$FASTP_OUTPUT" -j 4 | tee "$PREPROC_DIR/${sample}_stats.json"
+
+    echo "Finished sample $sample"
+    echo "--------------------------"
 done
+
+echo "All samples processed."
