@@ -77,13 +77,18 @@ for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do
     echo "Running FASTP trimming for $sample"
     FASTP_INPUT="$PREPROC_DIR/${sample}_merged.assembled.fastq"
     FASTP_OUTPUT="$PREPROC_DIR/${sample}_clean.fastq.gz"
-    $FASTP -i "$FASTP_INPUT" -o "$FASTP_OUTPUT" \
-        --qualified_quality_phred 20 --trim_poly_g --detect_adapter_for_pe \
-        1>"$LOG_DIR/${sample}_fastp.out" 2>"$LOG_DIR/${sample}_fastp.err"
+
+    if [ -s "$FASTP_INPUT" ]; then
+        $FASTP -i "$FASTP_INPUT" -o "$FASTP_OUTPUT" \
+            --qualified_quality_phred 20 --trim_poly_g --detect_adapter_for_pe \
+            1>"$LOG_DIR/${sample}_fastp.out" 2>"$LOG_DIR/${sample}_fastp.err"
 
     # Generate statistics
     echo "Generating stats for $sample"
     $SEQKIT stats "$FASTP_OUTPUT" -j 4 | tee "$PREPROC_DIR/${sample}_stats.json"
+    else
+    echo "WARNING: No assembled reads for $sample. Skipping fastp and stats."
+    fi
 
     echo "Completed processing for $sample"
 done
