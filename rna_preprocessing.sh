@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# set PATH to include java from conda env
+export PATH="$HOME/miniforge3/envs/rna-tools/bin:$PATH"
+
 # Ensure Conda is initialised
 source ~/miniforge3/etc/profile.d/conda.sh
 
