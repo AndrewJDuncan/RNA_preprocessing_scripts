@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+# Ensure Conda is initialised
+source ~/miniconda3/etc/profile.d/conda.sh
+
+# Activate the desired environment
+conda activate rna-tools
+
 # Define base directory
 BASE_DIR="$HOME/projects/rna_pipeline/mgp_test_data"
 
