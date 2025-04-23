@@ -24,7 +24,7 @@ REF_DIR="$BASE_DIR/references"
 mkdir -p "$PREPROC_DIR" "$LOG_DIR" "$OUTPUT_DIR" "$REF_DIR"
 
 # Tool paths
-BBMAP="/raid/VIDRL-USERS/HOME/aduncan/bbmap/bbmap.sh"
+BBMAP="/raid/VIDRL-USERS/HOME/aduncan/bbmap/bbduk.sh"
 FASTP="fastp"
 UMI_TOOLS="umi_tools"
 PEAR="pear"
