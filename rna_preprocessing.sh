@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Ensure Conda is initialised
-source ~/miniconda3/etc/profile.d/conda.sh
+source ~/miniforge3/etc/profile.d/conda.sh
 
 # Activate the desired environment
 conda activate rna-tools
