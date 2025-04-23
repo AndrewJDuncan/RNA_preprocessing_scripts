@@ -22,7 +22,7 @@ PEAR="pear"
 SEQKIT="seqkit"
 
 # Process each sample
-for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do 
+for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do
     sample=$(basename "$fq1" _R1_001.fastq.gz)
     fq2="$RAW_DIR/${sample}_R2_001.fastq.gz"
 
