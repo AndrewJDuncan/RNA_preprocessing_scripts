@@ -31,10 +31,10 @@ for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do
   echo "============================="
 
   echo "Aligning reads to reference..."
-  $BBMAP ref="$REF_GENOME" \
-         in1="$fq1" in2="$fq2" \
-         outm="$INTERMED_DIR/${sample}.sam" \
-         1>"$LOG_DIR/${sample}_align.out" 2>"$LOG_DIR/${sample}_align.err"
+ $BBMAP ref="$REF_GENOME" \
+       in1="$fq1" in2="$fq2" \
+       out="$INTERMED_DIR/${sample}.sam" \
+       1>"$LOG_DIR/${sample}_align.out" 2>"$LOG_DIR/${sample}_align.err"
 
   echo "Converting SAM to sorted BAM..."
   $SAMTOOLS view -bS "$INTERMED_DIR/${sample}.sam" | \
