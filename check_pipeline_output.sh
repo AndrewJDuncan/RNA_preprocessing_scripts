@@ -1,38 +1,58 @@
 #!/bin/bash
 
-PREPROC_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/preproc"
+# Activate environment
+source ~/miniforge3/etc/profile.d/conda.sh
+conda activate rna-tools
 
-echo "========================="
-echo "Checking pipeline outputs"
-echo "========================="
+# Set directories
+PROJECT_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data"
+PREPROC_DIR="${PROJECT_DIR}/preproc"
+INTERMED_DIR="${PROJECT_DIR}/intermediary_files"
 
-for fq in ${PREPROC_DIR}/*_clean.fastq.gz; do
-    [ -e "$fq" ] || continue
-    sample=$(basename "$fq")
-    echo "Sample: $sample"
+echo "=============================="
+echo "  Pipeline Output Check & Summary"
+echo "=============================="
+echo
 
-    # Check if gzipped fastq is valid
-    gzip -t "$fq" && echo "  FASTQ OK" || echo "  FASTQ CORRUPTED"
+# Header
+printf "%-35s %-15s %-15s %-15s %-20s\n" "Sample" "Pre-dedup Reads" "Post-dedup Reads" "Dedup Stats" "File Check"
 
-    # Count reads if OK
-    if gzip -t "$fq" >/dev/null 2>&1; then
-        readcount=$(zcat "$fq" | echo $((`wc -l`/4)))
-        echo "  Read count: $readcount"
+# Loop through dedup BAM files
+for DEDUP_BAM in ${PREPROC_DIR}/*.dedup.bam; do
+    SAMPLE=$(basename "$DEDUP_BAM" .dedup.bam)
+    ALIGN_BAM="${INTERMED_DIR}/${SAMPLE}.sorted.bam"
+    STATS_FILE="${PREPROC_DIR}/${SAMPLE}_dedup_stats.txt"
+
+    FILE_STATUS="✔️"
+    # Check files exist and non-zero
+    for FILE in "$DEDUP_BAM" "$ALIGN_BAM" "$STATS_FILE"; do
+        if [[ ! -s "$FILE" ]]; then
+            FILE_STATUS="❌"
+            break
+        fi
+    done
+
+    # Get read counts if files exist
+    if [[ -s "$DEDUP_BAM" && -s "$ALIGN_BAM" ]]; then
+        PRE_DEDUP_READS=$(samtools flagstat "$ALIGN_BAM" | head -n 1 | awk '{print $1}')
+        POST_DEDUP_READS=$(samtools flagstat "$DEDUP_BAM" | head -n 1 | awk '{print $1}')
+    else
+        PRE_DEDUP_READS="NA"
+        POST_DEDUP_READS="NA"
     fi
 
-    echo "-------------------------"
+    # Check dedup stats presence
+    if [[ -s "$STATS_FILE" ]]; then
+        STATS_STATUS="✔️"
+    else
+        STATS_STATUS="❌"
+    fi
+
+    # Print summary line
+    printf "%-35s %-15s %-15s %-15s %-20s\n" "$SAMPLE" "$PRE_DEDUP_READS" "$POST_DEDUP_READS" "$STATS_STATUS" "$FILE_STATUS"
 done
 
-# Check JSON reports
-for json in ${PREPROC_DIR}/*.json; do
-    [ -e "$json" ] || continue
-    sample=$(basename "$json")
-    echo "Sample: $sample"
-    total_reads=$(grep -m1 '"total_reads"' "$json" | head -1 | awk -F ':' '{print $2}' | tr -d ', ')
-    echo "  total_reads: $total_reads"
-    echo "-------------------------"
-done
-
-echo "========================="
-echo " Check completed "
-echo "========================="
+echo
+echo "=============================="
+echo "  Check & Summary complete!"
+echo "=============================="
