@@ -1,70 +1,58 @@
 #!/bin/bash
 
-# Ensure Conda is initialised
+# Activate environment
 source ~/miniforge3/etc/profile.d/conda.sh
-
-# Activate the desired environment
 conda activate rna-tools
 
-# Set variables
+# Set directories
 PROJECT_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data"
-REF_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/references"
-BBMAP_DIR="/raid/VIDRL-USERS/HOME/aduncan/bbmap"
-preproc_dir="$PROJECT_DIR/preproc"
-intermediary_dir="$PROJECT_DIR/intermediary_files"
+PREPROC_DIR="${PROJECT_DIR}/preproc"
+INTERMED_DIR="${PROJECT_DIR}/intermediary_files"
 
-mkdir -p "$preproc_dir"
-mkdir -p "$intermediary_dir"
+echo "=============================="
+echo "  Pipeline Output Check & Summary"
+echo "=============================="
+echo
 
-# Process each sample
-for r1 in "$PROJECT_DIR/rawdata"/*_R1_001.fastq.gz; do
-    sample=$(basename "$r1" | sed 's/_R1_001.fastq.gz//')
-    r2="$PROJECT_DIR/rawdata/${sample}_R2_001.fastq.gz"
+# Header
+printf "%-35s %-15s %-15s %-15s %-20s\n" "Sample" "Pre-dedup Reads" "Post-dedup Reads" "Dedup Stats" "File Check"
 
-    echo "============================="
-    echo "Processing sample: $sample"
-    echo "R1: $r1"
-    echo "R2: $r2"
-    echo "============================="
+# Loop through dedup BAM files
+for DEDUP_BAM in ${PREPROC_DIR}/*.dedup.bam; do
+    SAMPLE=$(basename "$DEDUP_BAM" .dedup.bam)
+    ALIGN_BAM="${INTERMED_DIR}/${SAMPLE}.sorted.bam"
+    STATS_FILE="${PREPROC_DIR}/${SAMPLE}_dedup_stats.txt"
 
-    # PhiX removal skipped for now
+    FILE_STATUS="✔️"
+    # Check files exist and non-zero
+    for FILE in "$DEDUP_BAM" "$ALIGN_BAM" "$STATS_FILE"; do
+        if [[ ! -s "$FILE" ]]; then
+            FILE_STATUS="❌"
+            break
+        fi
+    done
 
-    # UMI extraction
-    echo "Extracting UMIs for $sample"
-    umi_tools extract --bc-pattern=NNNNNNNN \
-        --stdin="$r1" \
-        --stdout="$intermediary_dir/${sample}_R1_extracted.fastq.gz" \
-        --read2-in="$r2" \
-        --read2-out="$intermediary_dir/${sample}_R2_extracted.fastq.gz"
+    # Get read counts if files exist
+    if [[ -s "$DEDUP_BAM" && -s "$ALIGN_BAM" ]]; then
+        PRE_DEDUP_READS=$(samtools flagstat "$ALIGN_BAM" | head -n 1 | awk '{print $1}')
+        POST_DEDUP_READS=$(samtools flagstat "$DEDUP_BAM" | head -n 1 | awk '{print $1}')
+    else
+        PRE_DEDUP_READS="NA"
+        POST_DEDUP_READS="NA"
+    fi
 
-    # Align with BBMap
-    echo "Aligning reads for $sample"
-    "$BBMAP_DIR/bbmap.sh" ref="$REF_DIR/hg38.fa" \
-        in1="$intermediary_dir/${sample}_R1_extracted.fastq.gz" \
-        in2="$intermediary_dir/${sample}_R2_extracted.fastq.gz" \
-        out="$intermediary_dir/${sample}.sam"
+    # Check dedup stats presence
+    if [[ -s "$STATS_FILE" ]]; then
+        STATS_STATUS="✔️"
+    else
+        STATS_STATUS="❌"
+    fi
 
-    # Convert SAM to BAM
-    samtools view -bS "$intermediary_dir/${sample}.sam" > "$intermediary_dir/${sample}.bam"
-
-    # Sort BAM
-    samtools sort "$intermediary_dir/${sample}.bam" -o "$intermediary_dir/${sample}.sorted.bam"
-
-    # Index BAM
-    samtools index "$intermediary_dir/${sample}.sorted.bam"
-
-    # Deduplicate
-    echo "Deduplicating BAM for $sample"
-    umi_tools dedup -I "$intermediary_dir/${sample}.sorted.bam" -S "$preproc_dir/${sample}.dedup.bam"
-
-    # BAM stats
-    samtools flagstat "$preproc_dir/${sample}.dedup.bam" > "$preproc_dir/${sample}.dedup_stats.txt"
-
-    echo "Finished processing $sample"
-    echo "------------------------------------------------------"
-
+    # Print summary line
+    printf "%-35s %-15s %-15s %-15s %-20s\n" "$SAMPLE" "$PRE_DEDUP_READS" "$POST_DEDUP_READS" "$STATS_STATUS" "$FILE_STATUS"
 done
 
-echo "========================="
-echo "Pipeline run completed!"
-echo "========================="
+echo
+echo "=============================="
+echo "  Check & Summary complete!"
+echo "=============================="
