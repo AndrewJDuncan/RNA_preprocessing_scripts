@@ -1,56 +1,68 @@
 #!/bin/bash
 
-# Activate Conda and environment
+# Ensure Conda is initialised
 source ~/miniforge3/etc/profile.d/conda.sh
+
+# Activate the desired environment
 conda activate rna-tools
 
-# Define directories
-BASE_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data"
-RAW_DIR="$BASE_DIR/rawdata"
-PREPROC_DIR="$BASE_DIR/preproc"
-INTERMED_DIR="$BASE_DIR/intermediary_files"
-LOG_DIR="$PREPROC_DIR/logs"
+# Set variables
+PROJECT_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data"
 REF_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/references"
-REF_GENOME="$REF_DIR/hg38.fa"
+BBMAP_DIR="/raid/VIDRL-USERS/HOME/aduncan/bbmap"
+preproc_dir="$PROJECT_DIR/preproc"
+intermediary_dir="$PROJECT_DIR/intermediary_files"
 
-# Create directories if missing
-mkdir -p "$PREPROC_DIR" "$INTERMED_DIR" "$LOG_DIR"
-
-# Tools
-BBMAP="/raid/VIDRL-USERS/HOME/aduncan/bbmap/bbmap.sh"
-SAMTOOLS="samtools"
-UMI_TOOLS="umi_tools"
+mkdir -p "$preproc_dir"
+mkdir -p "$intermediary_dir"
 
 # Process each sample
-for fq1 in "$RAW_DIR"/*R1_001.fastq.gz; do
-  sample=$(basename "$fq1" _R1_001.fastq.gz)
-  fq2="$RAW_DIR/${sample}_R2_001.fastq.gz"
+for r1 in "$PROJECT_DIR/rawdata"/*_R1_001.fastq.gz; do
+    sample=$(basename "$r1" | sed 's/_R1_001.fastq.gz//')
+    r2="$PROJECT_DIR/rawdata/${sample}_R2_001.fastq.gz"
 
-  echo "============================="
-  echo "Processing sample: $sample"
-  echo "============================="
+    echo "============================="
+    echo "Processing sample: $sample"
+    echo "R1: $r1"
+    echo "R2: $r2"
+    echo "============================="
 
-  echo "Aligning reads to reference..."
- $BBMAP ref="$REF_GENOME" \
-       in1="$fq1" in2="$fq2" \
-       out="$INTERMED_DIR/${sample}.sam" \
-       1>"$LOG_DIR/${sample}_align.out" 2>"$LOG_DIR/${sample}_align.err"
+    # PhiX removal skipped for now
 
-  echo "Converting SAM to sorted BAM..."
-  $SAMTOOLS view -bS "$INTERMED_DIR/${sample}.sam" | \
-  $SAMTOOLS sort -o "$INTERMED_DIR/${sample}.sorted.bam"
-  $SAMTOOLS index "$INTERMED_DIR/${sample}.sorted.bam"
+    # UMI extraction
+    echo "Extracting UMIs for $sample"
+    umi_tools extract --bc-pattern=NNNNNNNN \
+        --stdin="$r1" \
+        --stdout="$intermediary_dir/${sample}_R1_extracted.fastq.gz" \
+        --read2-in="$r2" \
+        --read2-out="$intermediary_dir/${sample}_R2_extracted.fastq.gz"
 
-  echo "Deduplicating with umi_tools..."
-  $UMI_TOOLS dedup -I "$INTERMED_DIR/${sample}.sorted.bam" \
-                   -S "$PREPROC_DIR/${sample}.dedup.bam" \
-                   --log="$LOG_DIR/${sample}_dedup.log"
+    # Align with BBMap
+    echo "Aligning reads for $sample"
+    "$BBMAP_DIR/bbmap.sh" ref="$REF_DIR/hg38.fa" \
+        in1="$intermediary_dir/${sample}_R1_extracted.fastq.gz" \
+        in2="$intermediary_dir/${sample}_R2_extracted.fastq.gz" \
+        out="$intermediary_dir/${sample}.sam"
 
-  echo "Generating BAM stats..."
-  $SAMTOOLS flagstat "$PREPROC_DIR/${sample}.dedup.bam" > "$PREPROC_DIR/${sample}_stats.txt"
+    # Convert SAM to BAM
+    samtools view -bS "$intermediary_dir/${sample}.sam" > "$intermediary_dir/${sample}.bam"
 
-  echo "Finished processing $sample"
-  echo "-----------------------------"
+    # Sort BAM
+    samtools sort "$intermediary_dir/${sample}.bam" -o "$intermediary_dir/${sample}.sorted.bam"
+
+    # Index BAM
+    samtools index "$intermediary_dir/${sample}.sorted.bam"
+
+    # Deduplicate
+    echo "Deduplicating BAM for $sample"
+    umi_tools dedup -I "$intermediary_dir/${sample}.sorted.bam" -S "$preproc_dir/${sample}.dedup.bam"
+
+    # BAM stats
+    samtools flagstat "$preproc_dir/${sample}.dedup.bam" > "$preproc_dir/${sample}.dedup_stats.txt"
+
+    echo "Finished processing $sample"
+    echo "------------------------------------------------------"
+
 done
 
 echo "========================="
