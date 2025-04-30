@@ -1,58 +1,47 @@
 #!/bin/bash
 
-# Activate environment
-source ~/miniforge3/etc/profile.d/conda.sh
-conda activate rna-tools
+# Check pipeline outputs for each sample
 
-# Set directories
-PROJECT_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data"
-PREPROC_DIR="${PROJECT_DIR}/preproc"
-INTERMED_DIR="${PROJECT_DIR}/intermediary_files"
+BASE_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data"
+PREPROC_DIR="$BASE_DIR/preproc"
+LOG_DIR="$PREPROC_DIR/logs"
 
-echo "=============================="
-echo "  Pipeline Output Check & Summary"
-echo "=============================="
-echo
+echo "========================="
+echo " Checking pipeline output "
+echo "========================="
 
-# Header
-printf "%-35s %-15s %-15s %-15s %-20s\n" "Sample" "Pre-dedup Reads" "Post-dedup Reads" "Dedup Stats" "File Check"
+# Loop through deduplicated BAM files
+for BAM_FILE in "$PREPROC_DIR"/*.dedup.bam; do
+    [ -e "$BAM_FILE" ] || continue  # skip if none exist
 
-# Loop through dedup BAM files
-for DEDUP_BAM in ${PREPROC_DIR}/*.dedup.bam; do
-    SAMPLE=$(basename "$DEDUP_BAM" .dedup.bam)
-    ALIGN_BAM="${INTERMED_DIR}/${SAMPLE}.sorted.bam"
-    STATS_FILE="${PREPROC_DIR}/${SAMPLE}_dedup_stats.txt"
+    SAMPLE=$(basename "$BAM_FILE" | sed 's/.dedup.bam//')
 
-    FILE_STATUS="✔️"
-    # Check files exist and non-zero
-    for FILE in "$DEDUP_BAM" "$ALIGN_BAM" "$STATS_FILE"; do
-        if [[ ! -s "$FILE" ]]; then
-            FILE_STATUS="❌"
-            break
-        fi
-    done
+    echo "Sample: $SAMPLE"
 
-    # Get read counts if files exist
-    if [[ -s "$DEDUP_BAM" && -s "$ALIGN_BAM" ]]; then
-        PRE_DEDUP_READS=$(samtools flagstat "$ALIGN_BAM" | head -n 1 | awk '{print $1}')
-        POST_DEDUP_READS=$(samtools flagstat "$DEDUP_BAM" | head -n 1 | awk '{print $1}')
+    # Check BAM file size
+    if [ ! -s "$BAM_FILE" ]; then
+        echo " ❌ dedup.bam missing or empty!"
     else
-        PRE_DEDUP_READS="NA"
-        POST_DEDUP_READS="NA"
+        echo " ✅ dedup.bam present"
     fi
 
-    # Check dedup stats presence
-    if [[ -s "$STATS_FILE" ]]; then
-        STATS_STATUS="✔️"
+    # Check stats file
+    if [ ! -s "$PREPROC_DIR/$SAMPLE.stats.txt" ]; then
+        echo " ❌ stats.txt missing or empty!"
     else
-        STATS_STATUS="❌"
+        echo " ✅ stats.txt present"
     fi
 
-    # Print summary line
-    printf "%-35s %-15s %-15s %-15s %-20s\n" "$SAMPLE" "$PRE_DEDUP_READS" "$POST_DEDUP_READS" "$STATS_STATUS" "$FILE_STATUS"
+    # Check dedup log
+    if [ ! -s "$PREPROC_DIR/$SAMPLE.dedup_log.txt" ]; then
+        echo " ⚠️  dedup_log.txt missing or empty"
+    else
+        echo " ✅ dedup_log.txt present"
+    fi
+
+    echo "-------------------------"
 done
 
-echo
-echo "=============================="
-echo "  Check & Summary complete!"
-echo "=============================="
+echo "========================="
+echo " Output check complete! "
+echo "========================="
