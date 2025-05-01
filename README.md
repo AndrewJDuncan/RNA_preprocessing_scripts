@@ -1,7 +1,7 @@
 # Steps in preprocessing and tools used
  1. Raw sequence QC - **FastQC** // **MultiQC**
 
-conda create -N RNA-seq
+```conda create -N RNA-seq
 
 conda install -n RNA-seq -c bioconda fastqc
 conda install -n RNA-seq -c bioconda fastp
@@ -16,7 +16,7 @@ conda create -N DEseq2 r-essentials r-base
 
 conda install -N DEseq2 -c bioconda bioconductor-deseq2
 conda install -N DEseq2 -c bioconda bioconductor-tximport 
-conda install -N DEseq2 -c r r-ggplot2 
+conda install -N DEseq2 -c r r-ggplot2 ```
 
 # Code used at each step
 **FastQC** 
