@@ -18,11 +18,14 @@ conda install -N DEseq2 -c bioconda bioconductor-deseq2
 conda install -N DEseq2 -c bioconda bioconductor-tximport 
 conda install -N DEseq2 -c r r-ggplot2 ```
 
+
 # Code used at each step
 **FastQC** 
 
+
 ```fastqc <sample>_1.fastq.gz -d . -o .
 fastqc <sample>_2.fastq.gz -d . -o .```
+
 
 --> combine these into one report with MultiQC
 
