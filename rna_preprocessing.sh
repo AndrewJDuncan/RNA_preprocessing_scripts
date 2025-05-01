@@ -45,7 +45,6 @@ mkdir -p "$PREPROC_DIR"
 for R1_FILE in "$RAW_DIR"/*_R1_001.fastq.gz; do
     BASENAME=$(basename "$R1_FILE")
     SAMPLE=$(echo "$BASENAME" | sed 's/_R1_001.fastq.gz//')
-
     R2_FILE="$RAW_DIR/${SAMPLE}_R2_001.fastq.gz"
 
     echo "============================"
@@ -63,11 +62,10 @@ for R1_FILE in "$RAW_DIR"/*_R1_001.fastq.gz; do
         echo "   $R1_FILE and $R2_FILE"
         echo "✅ Would align with hisat2 using reference: $REF_GENOME"
         echo "✅ Would convert SAM to sorted BAM"
+        echo "✅ Would index the sorted BAM"
         echo "✅ Would deduplicate BAM"
         echo "✅ Would generate flagstat stats"
     else
-        # Actual processing steps
-
         # Step 1: Extract UMIs
         umi_tools extract \
             --extract-method=string \
@@ -78,26 +76,31 @@ for R1_FILE in "$RAW_DIR"/*_R1_001.fastq.gz; do
             --read2-out="$INTER_DIR/${SAMPLE}_R2_extracted.fastq.gz" \
             --log="$INTER_DIR/${SAMPLE}_extract.log"
 
-        # Step 2: Align
+        # Step 2: Align with HISAT2
         hisat2 -x "$REF_GENOME" \
             -1 "$INTER_DIR/${SAMPLE}_R1_extracted.fastq.gz" \
             -2 "$INTER_DIR/${SAMPLE}_R2_extracted.fastq.gz" \
-            -S "$INTER_DIR/${SAMPLE}.sam"
+            -S "$INTER_DIR/${SAMPLE}.sam" \
+            > "$PREPROC_DIR/${SAMPLE}_hisat2.out" \
+            2> "$PREPROC_DIR/${SAMPLE}_hisat2.err"
 
         # Step 3: Convert SAM to sorted BAM
         samtools view -bS "$INTER_DIR/${SAMPLE}.sam" | samtools sort -o "$INTER_DIR/${SAMPLE}.sorted.bam"
 
-        # Remove SAM file
+        # Step 3.5: Index the sorted BAM so umi_tools can use it
+        samtools index "$INTER_DIR/${SAMPLE}.sorted.bam"
+
+        # Remove SAM file to save space
         rm "$INTER_DIR/${SAMPLE}.sam"
 
-        # Step 4: Deduplicate
+        # Step 4: Deduplicate using UMI-tools
         umi_tools dedup \
             --extract-umi-method=read_id \
             -I "$INTER_DIR/${SAMPLE}.sorted.bam" \
             -S "$PREPROC_DIR/${SAMPLE}.dedup.bam" \
             --log="$PREPROC_DIR/${SAMPLE}_dedup.log"
 
-        # Step 5: Stats
+        # Step 5: Generate BAM statistics
         samtools flagstat "$PREPROC_DIR/${SAMPLE}.dedup.bam" > "$PREPROC_DIR/${SAMPLE}_dedup_stats.txt"
 
         echo "✅ Sample $SAMPLE complete."
