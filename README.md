@@ -16,7 +16,8 @@ conda create -N DEseq2 r-essentials r-base
 
 conda install -N DEseq2 -c bioconda bioconductor-deseq2
 conda install -N DEseq2 -c bioconda bioconductor-tximport 
-conda install -N DEseq2 -c r r-ggplot2 ```
+conda install -N DEseq2 -c r r-ggplot2
+```
 
 
 # Code used at each step
