@@ -41,9 +41,10 @@ for R1_FILE in "$RAW_DIR"/*_R1_001.fastq.gz; do
     /raid/VIDRL-USERS/HOME/aduncan/bbmap/bbmap.sh ref="$GENOME_REF" in1="$R1_FILE" in2="$R2_FILE" \
         out="$INTER_DIR/$SAMPLE.sam" nodisk overwrite=t
 
-    # 2. Convert SAM to sorted BAM
+    # 2. Convert SAM to sorted BAM, index BAM for umi_tools dedup
     echo "Converting to BAM for $SAMPLE"
     samtools sort -o "$INTER_DIR/$SAMPLE.sorted.bam" "$INTER_DIR/$SAMPLE.sam"
+    samtools index "$INTERMED_DIR/${SAMPLE}.sorted.bam"
     rm "$INTER_DIR/$SAMPLE.sam"
 
     # 3. Deduplicate using UMI-tools
