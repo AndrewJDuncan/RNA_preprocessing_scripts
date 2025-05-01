@@ -1,57 +1,60 @@
 #!/bin/bash
 
-# ==============================
-# RNA-Seq Preprocessing Pipeline
-# Clean, updated, nohup-compatible
-# ==============================
+# Activate environment
+source ~/miniforge3/bin/activate rna-tools
 
 # Set directories
-RAW_DIR="../rawdata"
-PREPROC_DIR="../preproc"
-INTERMED_DIR="../intermediary_files"
-REF_GENOME="../references/hg38.fa"
+RAW_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/rawdata"
+PREPROC_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/preproc"
+REF_GENOME="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/references/hg38.fa"
+INTER_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/intermediary_files"
 
-# Create directories if they don't exist
-mkdir -p "$PREPROC_DIR" "$INTERMED_DIR"
+mkdir -p "$INTER_DIR" "$PREPROC_DIR"
 
-# Process each sample
-for R1_FILE in $RAW_DIR/*_R1_001.fastq.gz; do
-    BASENAME=$(basename "$R1_FILE" | sed 's/_R1_001.fastq.gz//')
-    R2_FILE="$RAW_DIR/${BASENAME}_R2_001.fastq.gz"
+# Optional: skip SAM generation
+SKIP_SAM=true
 
-    echo -e "\n=============================="
-    echo "Processing: $BASENAME"
-    echo -e "=============================="
+# Loop over samples
+for R1_FILE in "$RAW_DIR"/*_R1_001.fastq.gz; do
+    SAMPLE=$(basename "$R1_FILE" | sed 's/_R1_001.fastq.gz//')
+    R2_FILE="${RAW_DIR}/${SAMPLE}_R2_001.fastq.gz"
 
-    # Align to reference genome (output BAM directly, no .sam)
-    bwa mem -t 8 "$REF_GENOME" "$R1_FILE" "$R2_FILE" | \
-      samtools view -bS - > "$INTERMED_DIR/${BASENAME}.bam"
+    echo "=========================================="
+    echo "Processing sample: $SAMPLE"
+    echo "=========================================="
 
-    # Sort BAM
-    samtools sort -@ 8 -o "$INTERMED_DIR/${BASENAME}.sorted.bam" "$INTERMED_DIR/${BASENAME}.bam"
-    rm "$INTERMED_DIR/${BASENAME}.bam"
+    # Extract UMIs from start of R1 (first 8bp) into RX tag
+    umi_tools extract \
+        --bc-pattern=NNNNNNNN \
+        --stdin="$R1_FILE" \
+        --stdout="$INTER_DIR/${SAMPLE}_extracted_R1.fastq.gz" \
+        --read2-in="$R2_FILE" \
+        --read2-out="$INTER_DIR/${SAMPLE}_extracted_R2.fastq.gz"
 
-    # Index BAM
-    samtools index "$INTERMED_DIR/${BASENAME}.sorted.bam"
+    # Align reads to reference genome
+    hisat2 -x "$REF_GENOME" \
+        -1 "$INTER_DIR/${SAMPLE}_extracted_R1.fastq.gz" \
+        -2 "$INTER_DIR/${SAMPLE}_extracted_R2.fastq.gz" \
+        -S "$INTER_DIR/${SAMPLE}.sam"
 
-    # Deduplicate using umi_tools (UMIs are first 8bp of R1)
+    # Convert SAM to sorted BAM
+    samtools view -bS "$INTER_DIR/${SAMPLE}.sam" | samtools sort -o "$INTER_DIR/${SAMPLE}.sorted.bam"
+
+    if [ "$SKIP_SAM" = true ]; then
+        rm "$INTER_DIR/${SAMPLE}.sam"
+    fi
+
+    # Deduplicate using umi_tools
     umi_tools dedup \
-        --extract-umi-method=read_id \
-        --umi-separator="_" \
-        -I "$INTERMED_DIR/${BASENAME}.sorted.bam" \
-        -S "$PREPROC_DIR/${BASENAME}.dedup.bam" \
-        --log="$PREPROC_DIR/${BASENAME}.dedup_log.txt"
+        -I "$INTER_DIR/${SAMPLE}.sorted.bam" \
+        -S "$PREPROC_DIR/${SAMPLE}.dedup.bam"
 
-    # BAM stats
-    samtools flagstat "$PREPROC_DIR/${BASENAME}.dedup.bam" > "$PREPROC_DIR/${BASENAME}_stats.txt"
+    # BAM flagstat for stats
+    samtools flagstat "$PREPROC_DIR/${SAMPLE}.dedup.bam" > "$PREPROC_DIR/${SAMPLE}_dedup_stats.txt"
 
 done
 
-# ==============================
-# Run pipeline output check
-# ==============================
+# Run output checker
+bash check_pipeline_output.sh
 
-bash check_pipeline_output.sh "$PREPROC_DIR"
-
-# ==============================
-echo "Pipeline run complete."
+echo "✅ Pipeline run complete!"
