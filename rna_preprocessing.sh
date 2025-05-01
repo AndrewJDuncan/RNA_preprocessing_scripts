@@ -25,11 +25,12 @@ for R1_FILE in "$RAW_DIR"/*_R1_001.fastq.gz; do
 
     # Extract UMIs from start of R1 (first 8bp) into RX tag
     umi_tools extract \
-        --bc-pattern=NNNNNNNN \
-        --stdin="$R1_FILE" \
-        --stdout="$INTER_DIR/${SAMPLE}_extracted_R1.fastq.gz" \
-        --read2-in="$R2_FILE" \
-        --read2-out="$INTER_DIR/${SAMPLE}_extracted_R2.fastq.gz"
+    --bc-pattern=NNNNNNNN \
+    --stdin="$R1_FILE" \
+    --stdout="$INTER_DIR/${SAMPLE}_extracted_R1.fastq.gz" \
+    --read2-in="$R2_FILE" \
+    --read2-out="$INTER_DIR/${SAMPLE}_extracted_R2.fastq.gz" \
+    --log="$INTER_DIR/${SAMPLE}_extract.log"
 
     # Align reads to reference genome
     hisat2 -x "$REF_GENOME" \
