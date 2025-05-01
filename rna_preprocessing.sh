@@ -77,12 +77,13 @@ for R1_FILE in "$RAW_DIR"/*_R1_001.fastq.gz; do
             --log="$INTER_DIR/${SAMPLE}_extract.log"
 
         # Step 2: Align with HISAT2
-        hisat2 -x "$REF_GENOME" \
-            -1 "$INTER_DIR/${SAMPLE}_R1_extracted.fastq.gz" \
-            -2 "$INTER_DIR/${SAMPLE}_R2_extracted.fastq.gz" \
-            -S "$INTER_DIR/${SAMPLE}.sam" \
-            > "$PREPROC_DIR/${SAMPLE}_hisat2.out" \
-            2> "$PREPROC_DIR/${SAMPLE}_hisat2.err"
+        echo "🔄 Aligning reads with HISAT2 using 32 threads..."
+        hisat2 -p 32 -x "$REF_GENOME" \
+          -1 "$INTER_DIR/${SAMPLE}_R1_extracted.fastq.gz" \
+          -2 "$INTER_DIR/${SAMPLE}_R2_extracted.fastq.gz" \
+          -S "$INTER_DIR/${SAMPLE}.sam" \
+          > "$PREPROC_DIR/${SAMPLE}_hisat2.out" \
+          2> "$PREPROC_DIR/${SAMPLE}_hisat2.err"
 
         # Step 3: Convert SAM to sorted BAM
         samtools view -bS "$INTER_DIR/${SAMPLE}.sam" | samtools sort -o "$INTER_DIR/${SAMPLE}.sorted.bam"
