@@ -1,76 +1,57 @@
 #!/bin/bash
 
+# ==============================
+# RNA-Seq Preprocessing Pipeline
+# Clean, updated, nohup-compatible
+# ==============================
+
 # Set directories
-RAW_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/rawdata"
-INTERMED_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/intermediary_files"
-PREPROC_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/preproc"
-REF_GENOME="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/references/hg38.fa"
+RAW_DIR="../rawdata"
+PREPROC_DIR="../preproc"
+INTERMED_DIR="../intermediary_files"
+REF_GENOME="../references/hg38.fa"
 
-# Load environment if needed
-source activate rna-tools
-
-# Create output directories if not exist
-mkdir -p "$INTERMED_DIR" "$PREPROC_DIR"
-
-# List samples
-samples=$(ls "$RAW_DIR"/*.bam | xargs -n 1 basename | sed 's/.bam//')
+# Create directories if they don't exist
+mkdir -p "$PREPROC_DIR" "$INTERMED_DIR"
 
 # Process each sample
-for SAMPLE in $samples; do
-  echo "=============================================================="
-  echo "Processing sample: $SAMPLE"
-  echo "=============================================================="
+for R1_FILE in $RAW_DIR/*_R1_001.fastq.gz; do
+    BASENAME=$(basename "$R1_FILE" | sed 's/_R1_001.fastq.gz//')
+    R2_FILE="$RAW_DIR/${BASENAME}_R2_001.fastq.gz"
 
-  # Sort BAM
-  echo "Sorting BAM for $SAMPLE..."
-  samtools sort -o "$INTERMED_DIR/${SAMPLE}.sorted.bam" "$RAW_DIR/${SAMPLE}.bam"
+    echo -e "\n=============================="
+    echo "Processing: $BASENAME"
+    echo -e "=============================="
 
-  if [[ ! -s "$INTERMED_DIR/${SAMPLE}.sorted.bam" ]]; then
-    echo "ERROR: sorted BAM missing for $SAMPLE"
-    exit 1
-  fi
+    # Align to reference genome (output BAM directly, no .sam)
+    bwa mem -t 8 "$REF_GENOME" "$R1_FILE" "$R2_FILE" | \
+      samtools view -bS - > "$INTERMED_DIR/${BASENAME}.bam"
 
-  # Index BAM
-  echo "Indexing BAM for $SAMPLE..."
-  samtools index "$INTERMED_DIR/${SAMPLE}.sorted.bam"
+    # Sort BAM
+    samtools sort -@ 8 -o "$INTERMED_DIR/${BASENAME}.sorted.bam" "$INTERMED_DIR/${BASENAME}.bam"
+    rm "$INTERMED_DIR/${BASENAME}.bam"
 
-  if [[ ! -s "$INTERMED_DIR/${SAMPLE}.sorted.bam.bai" ]]; then
-    echo "ERROR: BAM index missing for $SAMPLE"
-    exit 1
-  fi
+    # Index BAM
+    samtools index "$INTERMED_DIR/${BASENAME}.sorted.bam"
 
-  # Deduplicate with umi_tools
-  echo "Deduplicating BAM for $SAMPLE..."
-  umi_tools dedup \
-    -I "$INTERMED_DIR/${SAMPLE}.sorted.bam" \
-    -S "$PREPROC_DIR/${SAMPLE}.dedup.bam" \
-    --log="$PREPROC_DIR/${SAMPLE}.dedup_log.txt"
+    # Deduplicate using umi_tools (UMIs are first 8bp of R1)
+    umi_tools dedup \
+        --extract-umi-method=read_id \
+        --umi-separator="_" \
+        -I "$INTERMED_DIR/${BASENAME}.sorted.bam" \
+        -S "$PREPROC_DIR/${BASENAME}.dedup.bam" \
+        --log="$PREPROC_DIR/${BASENAME}.dedup_log.txt"
 
-  if [[ ! -s "$PREPROC_DIR/${SAMPLE}.dedup.bam" ]]; then
-    echo "ERROR: deduplicated BAM missing for $SAMPLE"
-    exit 1
-  fi
+    # BAM stats
+    samtools flagstat "$PREPROC_DIR/${BASENAME}.dedup.bam" > "$PREPROC_DIR/${BASENAME}_stats.txt"
 
-  # BAM stats
-  echo "Generating stats for $SAMPLE..."
-  samtools flagstat "$PREPROC_DIR/${SAMPLE}.dedup.bam" > "$PREPROC_DIR/${SAMPLE}.dedup_stats.txt"
-
-  if [[ ! -s "$PREPROC_DIR/${SAMPLE}.dedup_stats.txt" ]]; then
-    echo "ERROR: stats.txt missing for $SAMPLE"
-    exit 1
-  fi
-
-  echo "Finished processing $SAMPLE"
 done
 
-# Run pipeline output check script
-echo "=============================================================="
-echo "Pipeline run completed!"
-echo "Running check_pipeline_output.sh..."
-echo "=============================================================="
+# ==============================
+# Run pipeline output check
+# ==============================
 
-bash check_pipeline_output.sh
+bash check_pipeline_output.sh "$PREPROC_DIR"
 
-echo " ----------------------- "
-echo "~~~ All done ~~~"
-echo " ----------------------- "
+# ==============================
+echo "Pipeline run complete."
