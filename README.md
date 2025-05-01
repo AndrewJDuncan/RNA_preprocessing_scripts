@@ -3,8 +3,10 @@
 
 # Code used at each step
 **FastQC** 
+
 ```fastqc <sample>_1.fastq.gz -d . -o .
 fastqc <sample>_2.fastq.gz -d . -o .```
+
 --> combine these into one report with MultiQC
 
 Then can get read count with:
