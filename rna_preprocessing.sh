@@ -43,13 +43,15 @@ for R1_FILE in "$RAW_DIR"/*_R1_001.fastq.gz; do
 
     # 2. Convert SAM to sorted BAM, index BAM for umi_tools dedup
     echo "Converting to BAM for $SAMPLE"
-    samtools sort -o "$INTER_DIR/$SAMPLE.sorted.bam" "$INTER_DIR/$SAMPLE.sam"
+    samtools sort -o "$INTERMED_DIR/${SAMPLE}.sorted.bam" "$INTERMED_DIR/${SAMPLE}.sam"
     samtools index "$INTERMED_DIR/${SAMPLE}.sorted.bam"
-    rm "$INTER_DIR/$SAMPLE.sam"
 
     # 3. Deduplicate using UMI-tools
     echo "Deduplicating for $SAMPLE"
-    umi_tools dedup -I "$INTER_DIR/$SAMPLE.sorted.bam" -S "$PREPROC_DIR/$SAMPLE.dedup.bam" --extract-umi-method=read_id --umi-separator=":" --log="$PREPROC_DIR/$SAMPLE.dedup_log.txt"
+    umi_tools dedup \
+    -I "$INTERMED_DIR/${SAMPLE}.sorted.bam" \
+    -S "$PREPROC_DIR/${SAMPLE}.dedup.bam" \
+    --log="$PREPROC_DIR/${SAMPLE}.dedup_log.txt"
 
     # 4. Collect stats
     echo "Generating BAM stats for $SAMPLE"
