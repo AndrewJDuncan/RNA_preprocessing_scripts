@@ -25,7 +25,8 @@ conda install -N DEseq2 -c r r-ggplot2
 
 
 ```fastqc <sample>_1.fastq.gz -d . -o .
-fastqc <sample>_2.fastq.gz -d . -o .```
+fastqc <sample>_2.fastq.gz -d . -o .
+```
 
 
 --> combine these into one report with MultiQC
