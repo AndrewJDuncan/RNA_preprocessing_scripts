@@ -1,7 +1,10 @@
 # Steps in preprocessing and tools used
  1. Raw sequence QC - **FastQC** // **MultiQC**
 
-```conda create -N RNA-seq
+
+
+```
+conda create -N RNA-seq
 
 conda install -n RNA-seq -c bioconda fastqc
 conda install -n RNA-seq -c bioconda fastp
@@ -24,7 +27,8 @@ conda install -N DEseq2 -c r r-ggplot2
 **FastQC** 
 
 
-```fastqc <sample>_1.fastq.gz -d . -o .
+```
+fastqc <sample>_1.fastq.gz -d . -o .
 fastqc <sample>_2.fastq.gz -d . -o .
 ```
 
@@ -32,8 +36,10 @@ fastqc <sample>_2.fastq.gz -d . -o .
 --> combine these into one report with MultiQC
 
 Then can get read count with:
-```totalreads=$(unzip -c <sample>_fastqc.zip <sample>_fastqc/fastqc_data.txt | grep 'Total Sequences' | cut -f 2)
-echo $totalreads```
+```
+totalreads=$(unzip -c <sample>_fastqc.zip <sample>_fastqc/fastqc_data.txt | grep 'Total Sequences' | cut -f 2)
+echo $totalreads
+```
 --> saves totalreads as a variable for later in pipeline
 
 
