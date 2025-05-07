@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Strict mode and command tracing
+set -euo pipefail
+set -x
+
 # Activate conda environment
 source ~/miniforge3/etc/profile.d/conda.sh
 conda activate rna-tools
@@ -15,7 +19,7 @@ INTERMEDIATE_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_
 # Create output directories if they don't exist
 mkdir -p "$PREPROC_DIR" "$INTERMEDIATE_DIR"
 
-# Loop through each R1 fastq file
+# Loop through each R1 FASTQ file
 for R1 in $RAW_DIR/*_R1_001.fastq.gz; do
     SAMPLE=$(basename "$R1" _R1_001.fastq.gz)
     R2="${R1/_R1_001.fastq.gz/_R2_001.fastq.gz}"
@@ -44,16 +48,16 @@ for R1 in $RAW_DIR/*_R1_001.fastq.gz; do
     CLEANED_R2="$PREPROC_DIR/${SAMPLE}_cleaned_R2.fastq.gz"
     STATS2="$PREPROC_DIR/${SAMPLE}_stats2.json"
 
-    #### STEP 1: Get stats on raw reads
-    hts_Stats -t $THREADS -1 "$R1" -2 "$R2" -f "$INTERMEDIATE_DIR/${SAMPLE}_stats1" -L "$STATS1"
+    #### STEP 1: Get stats on raw reads (JSON output only)
+    hts_Stats -t $THREADS -1 "$R1" -2 "$R2" -L "$STATS1"
 
     #### STEP 2: Remove phiX
     hts_SeqScreener -t $THREADS -1 "$R1" -2 "$R2" phix -o "$PHIX_R1" -O "$PHIX_R2"
 
-    #### STEP 3: Count rRNA
+    #### STEP 3: Count rRNA (no removal)
     hts_SeqScreener -t $THREADS -1 "$PHIX_R1" -2 "$PHIX_R2" rrna -o "$RRNA_R1" -O "$RRNA_R2"
 
-    #### STEP 4: UMI-tools dedup
+    #### STEP 4: UMI-tools deduplication
     if [[ -f "$RRNA_R1" && -f "$RRNA_R2" ]]; then
         umi_tools dedup --stdin="$RRNA_R1" --stdout="$DEDUP_R1"
         umi_tools dedup --stdin="$RRNA_R2" --stdout="$DEDUP_R2"
@@ -77,8 +81,8 @@ for R1 in $RAW_DIR/*_R1_001.fastq.gz; do
     #### STEP 9: Filter by length
     hts_LengthFilter -t $THREADS -1 "$QTRIM_R1" -2 "$QTRIM_R2" --min-length 50 -o "$CLEANED_R1" -O "$CLEANED_R2"
 
-    #### STEP 10: Stats on cleaned reads
-    hts_Stats -t $THREADS -1 "$CLEANED_R1" -2 "$CLEANED_R2" -f "$PREPROC_DIR/${SAMPLE}_stats2" -L "$STATS2"
+    #### STEP 10: Get stats on cleaned reads (JSON output only)
+    hts_Stats -t $THREADS -1 "$CLEANED_R1" -2 "$CLEANED_R2" -L "$STATS2"
 
     echo "Finished processing sample: $SAMPLE"
 done
