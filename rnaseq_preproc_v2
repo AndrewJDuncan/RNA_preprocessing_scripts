@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Activate the conda environment
-source ~/miniforge3/etc/profile.d/conda.sh
+# Activate conda environment
+eval "$(conda shell.bash hook)"
 conda activate rna-tools
 
 # Define directories
@@ -9,69 +9,80 @@ RAW_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/rawd
 PREPROC_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/preproc"
 INTERMEDIATE_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/intermediary_files"
 
-# Create output directories if they don't exist - for future pipeline
+# Create output directories if they don't exist
 mkdir -p "$PREPROC_DIR" "$INTERMEDIATE_DIR"
 
-# Loop through each pair of FASTQ files
+# Loop through each R1 fastq file
 for R1 in $RAW_DIR/*_R1.fastq.gz; do
-    # Derive corresponding R2 filename
+    SAMPLE=$(basename "$R1" _R1.fastq.gz)
     R2="${R1/_R1.fastq.gz/_R2.fastq.gz}"
 
-    # Extract base sample name
-    SAMPLE=$(basename "$R1" _R1.fastq.gz)
-
+    echo "=========="
     echo "Processing sample: $SAMPLE"
+    echo "=========="
 
-    # Define intermediate filenames
+    # Define all intermediate and final file paths
     STATS1="$INTERMEDIATE_DIR/${SAMPLE}_stats1.json"
-    PHIX_REMOVED_R1="$INTERMEDIATE_DIR/${SAMPLE}_phix_removed_R1.fastq.gz"
-    PHIX_REMOVED_R2="$INTERMEDIATE_DIR/${SAMPLE}_phix_removed_R2.fastq.gz"
-    RRNA_COUNT_R1="$INTERMEDIATE_DIR/${SAMPLE}_rrna_count_R1.fastq.gz"
-    RRNA_COUNT_R2="$INTERMEDIATE_DIR/${SAMPLE}_rrna_count_R2.fastq.gz"
+    PHIX_R1="$INTERMEDIATE_DIR/${SAMPLE}_phix_R1.fastq.gz"
+    PHIX_R2="$INTERMEDIATE_DIR/${SAMPLE}_phix_R2.fastq.gz"
+    RRNA_R1="$INTERMEDIATE_DIR/${SAMPLE}_rrna_R1.fastq.gz"
+    RRNA_R2="$INTERMEDIATE_DIR/${SAMPLE}_rrna_R2.fastq.gz"
     DEDUP_R1="$INTERMEDIATE_DIR/${SAMPLE}_dedup_R1.fastq.gz"
     DEDUP_R2="$INTERMEDIATE_DIR/${SAMPLE}_dedup_R2.fastq.gz"
-    ADAPTER_TRIMMED_R1="$INTERMEDIATE_DIR/${SAMPLE}_adapter_trimmed_R1.fastq.gz"
-    ADAPTER_TRIMMED_R2="$INTERMEDIATE_DIR/${SAMPLE}_adapter_trimmed_R2.fastq.gz"
-    POLYAT_TRIMMED_R1="$INTERMEDIATE_DIR/${SAMPLE}_polyAT_trimmed_R1.fastq.gz"
-    POLYAT_TRIMMED_R2="$INTERMEDIATE_DIR/${SAMPLE}_polyAT_trimmed_R2.fastq.gz"
-    N_TRIMMED_R1="$INTERMEDIATE_DIR/${SAMPLE}_n_trimmed_R1.fastq.gz"
-    N_TRIMMED_R2="$INTERMEDIATE_DIR/${SAMPLE}_n_trimmed_R2.fastq.gz"
-    QTRIMMED_R1="$INTERMEDIATE_DIR/${SAMPLE}_qtrimmed_R1.fastq.gz"
-    QTRIMMED_R2="$INTERMEDIATE_DIR/${SAMPLE}_qtrimmed_R2.fastq.gz"
-    LENGTH_FILTERED_R1="$PREPROC_DIR/${SAMPLE}_cleaned_R1.fastq.gz"
-    LENGTH_FILTERED_R2="$PREPROC_DIR/${SAMPLE}_cleaned_R2.fastq.gz"
+    ADAPT_R1="$INTERMEDIATE_DIR/${SAMPLE}_adapt_R1.fastq.gz"
+    ADAPT_R2="$INTERMEDIATE_DIR/${SAMPLE}_adapt_R2.fastq.gz"
+    POLY_R1="$INTERMEDIATE_DIR/${SAMPLE}_poly_R1.fastq.gz"
+    POLY_R2="$INTERMEDIATE_DIR/${SAMPLE}_poly_R2.fastq.gz"
+    NTRIM_R1="$INTERMEDIATE_DIR/${SAMPLE}_ntrim_R1.fastq.gz"
+    NTRIM_R2="$INTERMEDIATE_DIR/${SAMPLE}_ntrim_R2.fastq.gz"
+    QTRIM_R1="$INTERMEDIATE_DIR/${SAMPLE}_qtrim_R1.fastq.gz"
+    QTRIM_R2="$INTERMEDIATE_DIR/${SAMPLE}_qtrim_R2.fastq.gz"
+    CLEANED_R1="$PREPROC_DIR/${SAMPLE}_cleaned_R1.fastq.gz"
+    CLEANED_R2="$PREPROC_DIR/${SAMPLE}_cleaned_R2.fastq.gz"
     STATS2="$PREPROC_DIR/${SAMPLE}_stats2.json"
 
-    # Step 1: Get stats on raw reads
-    hts_Stats -1 "$R1" -2 "$R2" -o "$STATS1"
+    #### STEP 1: Get stats on raw reads
+    hts_Stats -1 "$R1" -2 "$R2" --json "$STATS1"
 
-    # Step 2: Remove phiX
-    hts_SeqScreener -1 "$R1" -2 "$R2" --screen phix --remove -o "$PHIX_REMOVED_R1" -O "$PHIX_REMOVED_R2"
+    #### STEP 2: Remove phiX
+    hts_SeqScreener -1 "$R1" -2 "$R2" --screen phix --remove \
+        --out1 "$PHIX_R1" --out2 "$PHIX_R2"
 
-    # Step 3: Count rRNA
-    hts_SeqScreener -1 "$PHIX_REMOVED_R1" -2 "$PHIX_REMOVED_R2" --screen-for rrna -o "$RRNA_COUNT_R1" -O "$RRNA_COUNT_R2"
+    #### STEP 3: Count rRNA (don't remove)
+    hts_SeqScreener -1 "$PHIX_R1" -2 "$PHIX_R2" --screen rrna \
+        --out1 "$RRNA_R1" --out2 "$RRNA_R2"
 
-    # Step 4: Remove PCR duplicates using UMI-tools
-    umi_tools dedup -I "$RRNA_COUNT_R1" -S "$DEDUP_R1"
-    umi_tools dedup -I "$RRNA_COUNT_R2" -S "$DEDUP_R2"
+    #### STEP 4: UMI-tools dedup (make sure input exists)
+    if [[ -f "$RRNA_R1" && -f "$RRNA_R2" ]]; then
+        umi_tools dedup --stdin="$RRNA_R1" --stdout="$DEDUP_R1"
+        umi_tools dedup --stdin="$RRNA_R2" --stdout="$DEDUP_R2"
+    else
+        echo "Missing rRNA-screened files for $SAMPLE, skipping."
+        continue
+    fi
 
-    # Step 5: Remove adapter sequences
-    hts_AdapterTrimmer -1 "$DEDUP_R1" -2 "$DEDUP_R2" -o "$ADAPTER_TRIMMED_R1" -O "$ADAPTER_TRIMMED_R2"
+    #### STEP 5: Trim adapters
+    hts_AdapterTrimmer -1 "$DEDUP_R1" -2 "$DEDUP_R2" \
+        --out1 "$ADAPT_R1" --out2 "$ADAPT_R2"
 
-    # Step 6: Remove polyA/T tails
-    hts_PolyATTrim -1 "$ADAPTER_TRIMMED_R1" -2 "$ADAPTER_TRIMMED_R2" -o "$POLYAT_TRIMMED_R1" -O "$POLYAT_TRIMMED_R2"
+    #### STEP 6: Trim polyA/T tails
+    hts_PolyATTrim -1 "$ADAPT_R1" -2 "$ADAPT_R2" \
+        --out1 "$POLY_R1" --out2 "$POLY_R2"
 
-    # Step 7: Trim Ns
-    hts_NTrimmer -1 "$POLYAT_TRIMMED_R1" -2 "$POLYAT_TRIMMED_R2" -o "$N_TRIMMED_R1" -O "$N_TRIMMED_R2"
+    #### STEP 7: Remove N bases
+    hts_NTrimmer -1 "$POLY_R1" -2 "$POLY_R2" \
+        --out1 "$NTRIM_R1" --out2 "$NTRIM_R2"
 
-    # Step 8: Quality trimming
-    hts_QWindowTrim -1 "$N_TRIMMED_R1" -2 "$N_TRIMMED_R2" -o "$QTRIMMED_R1" -O "$QTRIMMED_R2"
+    #### STEP 8: Quality trim
+    hts_QWindowTrim -1 "$NTRIM_R1" -2 "$NTRIM_R2" \
+        --out1 "$QTRIM_R1" --out2 "$QTRIM_R2"
 
-    # Step 9: Filter reads shorter than 50bp
-    hts_LengthFilter -1 "$QTRIMMED_R1" -2 "$QTRIMMED_R2" --min-length 50 -o "$LENGTH_FILTERED_R1" -O "$LENGTH_FILTERED_R2"
+    #### STEP 9: Length filter (<50bp removed)
+    hts_LengthFilter -1 "$QTRIM_R1" -2 "$QTRIM_R2" --min-length 50 \
+        --out1 "$CLEANED_R1" --out2 "$CLEANED_R2"
 
-    # Step 10: Get stats on cleaned reads
-    hts_Stats -1 "$LENGTH_FILTERED_R1" -2 "$LENGTH_FILTERED_R2" -o "$STATS2"
+    #### STEP 10: Final stats
+    hts_Stats -1 "$CLEANED_R1" -2 "$CLEANED_R2" --json "$STATS2"
 
     echo "Finished processing sample: $SAMPLE"
 done
