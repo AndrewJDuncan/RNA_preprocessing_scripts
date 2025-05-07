@@ -9,7 +9,7 @@ RAW_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/rawd
 PREPROC_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/preproc"
 INTERMEDIATE_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/intermediary_files"
 
-# Create output directories if they don't exist
+# Create output directories if they don't exist - for future pipeline
 mkdir -p "$PREPROC_DIR" "$INTERMEDIATE_DIR"
 
 # Loop through each pair of FASTQ files
