@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 
 # Activate conda environment
 source ~/miniforge3/etc/profile.d/conda.sh
