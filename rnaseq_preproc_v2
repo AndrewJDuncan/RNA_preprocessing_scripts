@@ -4,6 +4,9 @@
 source ~/miniforge3/etc/profile.d/conda.sh
 conda activate rna-tools
 
+# Set number of threads
+THREADS=32
+
 # Define directories
 RAW_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/rawdata"
 PREPROC_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_data/preproc"
@@ -42,15 +45,15 @@ for R1 in $RAW_DIR/*_R1_001.fastq.gz; do
     STATS2="$PREPROC_DIR/${SAMPLE}_stats2.json"
 
     #### STEP 1: Get stats on raw reads
-    hts_Stats -1 "$R1" -2 "$R2" -f "$INTERMEDIATE_DIR/${SAMPLE}_stats1" -L "$STATS1"
+    hts_Stats -t $THREADS -1 "$R1" -2 "$R2" -f "$INTERMEDIATE_DIR/${SAMPLE}_stats1" -L "$STATS1"
 
-    #### Remove phix
-    hts_SeqScreener -1 "$R1" -2 "$R2" phix -o "$PHIX_R1" -O "$PHIX_R2"
+    #### STEP 2: Remove phiX
+    hts_SeqScreener -t $THREADS -1 "$R1" -2 "$R2" phix -o "$PHIX_R1" -O "$PHIX_R2"
 
-    #### Screen for rRNA (do not remove)
-    hts_SeqScreener -1 "$PHIX_R1" -2 "$PHIX_R2" rrna -o "$RRNA_R1" -O "$RRNA_R2"
+    #### STEP 3: Count rRNA
+    hts_SeqScreener -t $THREADS -1 "$PHIX_R1" -2 "$PHIX_R2" rrna -o "$RRNA_R1" -O "$RRNA_R2"
 
-    #### STEP 4: UMI-tools dedup (make sure input exists)
+    #### STEP 4: UMI-tools dedup
     if [[ -f "$RRNA_R1" && -f "$RRNA_R2" ]]; then
         umi_tools dedup --stdin="$RRNA_R1" --stdout="$DEDUP_R1"
         umi_tools dedup --stdin="$RRNA_R2" --stdout="$DEDUP_R2"
@@ -59,28 +62,23 @@ for R1 in $RAW_DIR/*_R1_001.fastq.gz; do
         continue
     fi
 
-    #### STEP 5: Trim adapters
-    hts_AdapterTrimmer -1 "$DEDUP_R1" -2 "$DEDUP_R2" \
-        --out1 "$ADAPT_R1" --out2 "$ADAPT_R2"
+    #### STEP 5: Adapter trimming
+    hts_AdapterTrimmer -t $THREADS -1 "$DEDUP_R1" -2 "$DEDUP_R2" -o "$ADAPT_R1" -O "$ADAPT_R2"
 
-    #### STEP 6: Trim polyA/T tails
-    hts_PolyATTrim -1 "$ADAPT_R1" -2 "$ADAPT_R2" \
-        --out1 "$POLY_R1" --out2 "$POLY_R2"
+    #### STEP 6: PolyA/T trimming
+    hts_PolyATTrim -t $THREADS -1 "$ADAPT_R1" -2 "$ADAPT_R2" -o "$POLY_R1" -O "$POLY_R2"
 
-    #### STEP 7: Remove N bases
-    hts_NTrimmer -1 "$POLY_R1" -2 "$POLY_R2" \
-        --out1 "$NTRIM_R1" --out2 "$NTRIM_R2"
+    #### STEP 7: Trim Ns
+    hts_NTrimmer -t $THREADS -1 "$POLY_R1" -2 "$POLY_R2" -o "$NTRIM_R1" -O "$NTRIM_R2"
 
-    #### STEP 8: Quality trim
-    hts_QWindowTrim -1 "$NTRIM_R1" -2 "$NTRIM_R2" \
-        --out1 "$QTRIM_R1" --out2 "$QTRIM_R2"
+    #### STEP 8: Quality trimming
+    hts_QWindowTrim -t $THREADS -1 "$NTRIM_R1" -2 "$NTRIM_R2" -o "$QTRIM_R1" -O "$QTRIM_R2"
 
-    #### STEP 9: Length filter (<50bp removed)
-    hts_LengthFilter -1 "$QTRIM_R1" -2 "$QTRIM_R2" --min-length 50 \
-        --out1 "$CLEANED_R1" --out2 "$CLEANED_R2"
+    #### STEP 9: Filter by length
+    hts_LengthFilter -t $THREADS -1 "$QTRIM_R1" -2 "$QTRIM_R2" --min-length 50 -o "$CLEANED_R1" -O "$CLEANED_R2"
 
-    #### STEP 10: Final stats
-    hts_Stats -1 "$CLEANED_R1" -2 "$CLEANED_R2" -f "$PREPROC_DIR/${SAMPLE}_stats2" -L "$STATS2"
+    #### STEP 10: Stats on cleaned reads
+    hts_Stats -t $THREADS -1 "$CLEANED_R1" -2 "$CLEANED_R2" -f "$PREPROC_DIR/${SAMPLE}_stats2" -L "$STATS2"
 
     echo "Finished processing sample: $SAMPLE"
 done
