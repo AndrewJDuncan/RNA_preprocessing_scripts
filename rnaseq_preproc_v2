@@ -13,7 +13,7 @@ INTERMEDIATE_DIR="/raid/VIDRL-USERS/HOME/aduncan/projects/rna_pipeline/mgp_test_
 mkdir -p "$PREPROC_DIR" "$INTERMEDIATE_DIR"
 
 # Loop through each pair of FASTQ files
-for R1 in "$RAW_DIR"/*_R1.fastq.gz; do
+for R1 in $RAW_DIR/*_R1.fastq.gz; do
     # Derive corresponding R2 filename
     R2="${R1/_R1.fastq.gz/_R2.fastq.gz}"
 
@@ -46,7 +46,7 @@ for R1 in "$RAW_DIR"/*_R1.fastq.gz; do
     hts_Stats -1 "$R1" -2 "$R2" -o "$STATS1"
 
     # Step 2: Remove phiX
-    hts_SeqScreener -1 "$R1" -2 "$R2" --screen-out phix -o "$PHIX_REMOVED_R1" -O "$PHIX_REMOVED_R2"
+    hts_SeqScreener -1 "$R1" -2 "$R2" --screen phix --remove -o "$PHIX_REMOVED_R1" -O "$PHIX_REMOVED_R2"
 
     # Step 3: Count rRNA
     hts_SeqScreener -1 "$PHIX_REMOVED_R1" -2 "$PHIX_REMOVED_R2" --screen-for rrna -o "$RRNA_COUNT_R1" -O "$RRNA_COUNT_R2"
