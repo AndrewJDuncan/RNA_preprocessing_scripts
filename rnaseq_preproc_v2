@@ -51,7 +51,12 @@ for R1 in "$RAW_DIR"/*_R1_001.fastq.gz; do
     hts_Stats -t "$THREADS" -1 "$R1" -2 "$R2" -L "$STATS1" -F
 
     # Step 2: Remove phiX — output files before input files
-    hts_SeqScreener phix -o "$PHIX_R1" -o "$PHIX_R2" -1 "$R1" -2 "$R2" -t "$THREADS"
+    hts_SeqScreener phix \
+      --output_r1 "$PHIX_R1" \
+      --output_r2 "$PHIX_R2" \
+      -1 "$R1" \
+      -2 "$R2" \
+      -t "$THREADS"
 
     # Step 3: Screen for rRNA (count only, no removal)
     hts_SeqScreener rrna -o "$RRNA_R1" -o "$RRNA_R2" -1 "$PHIX_R1" -2 "$PHIX_R2" -t "$THREADS"
